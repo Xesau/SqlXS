@@ -84,7 +84,7 @@ class XsQueryBuilder extends QueryBuilder
      * Select all results from the query
      *
      * @throws XsException When the query type is not SELECT
-     * @return \Generator<XS> The objects
+     * @return XS[] The objects
      */
     public function all()
     {
@@ -96,8 +96,11 @@ class XsQueryBuilder extends QueryBuilder
 
         // Fetch all the results and yield them as SqlXS object instances
         $result = $this->perform();
+        $output = array();
         foreach ($result->fetchAll(PDO::FETCH_NUM) as $entry)
-            yield $xs::byID($entry[0]);
+            $output[] = $xs::byID($entry[0]);
+
+        return $output;
     }
 
 }

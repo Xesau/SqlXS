@@ -120,7 +120,7 @@ trait XS
      */
     private function getField($field)
     {
-        if (!isset($this->data[$field]))
+        if (!array_key_exists($field, $this->data))
             throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
 
         return $this->data[$field];
@@ -136,6 +136,8 @@ trait XS
      */
     private function setField($field, $value)
     {
+        if (!array_key_exists($field, $this->data))
+            throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
         $type = self::sqlXS()->getType($field);
         if ($type !== null) {
             if (is_scalar($value)) {
