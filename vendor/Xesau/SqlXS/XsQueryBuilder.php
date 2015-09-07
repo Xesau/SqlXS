@@ -37,7 +37,7 @@ class XsQueryBuilder extends QueryBuilder
     }
 
     /**
-     * Fetch the first n objects
+     * Fetch the first n objects, and moves the skip pointer ahead
      *
      * @param int $amount The amount of objects
      * @throws XsException When the query type is not SELECT
@@ -52,14 +52,15 @@ class XsQueryBuilder extends QueryBuilder
         if ($amount < 1)
             throw new DomainException('You cannot request 0 or less objects.');
 
-
+        $limit = $this->getLimit();
         $this->limit($amount);
         $xs = $this->xsClass;
 
         $result = $this->perform();
-        if(self::$pdo->errorInfo()) {
+        $this->limit($limit);
 
-        }
+        $this->skip($this->getSkip() + $amount);
+
         // If there are less rows available than requested for, throw a RangeException
         if ($result->rowCount() < $amount) {
             throw new RangeException('Only '. $result->rowCount() .' rows were found, while '. $amount .' were requested');
