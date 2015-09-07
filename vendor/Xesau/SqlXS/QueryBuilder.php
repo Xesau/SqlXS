@@ -32,11 +32,14 @@ class QueryBuilder
     const LTEQ = 5;
     const GTEQ = 6;
     const REFS = 7;
+    const NREFS = 8;
+    const INSUB = 9;
 
     /**
      * @var int $type The query type
-     * @var array[] $orders The order fields
-     * @var array[] $wheres The set of where rules
+     * @var OrderRule[] $orders The order fields
+     * @var WhereCondition[] $wheres The set of where rules
+     * @var SubSelect[] $subs The Subselects
      * @var array $fields The fields for the UPDATE or SELECT queries.
      * @var int $skip The amount of rows skipped.
      * @var int $limit The maximum amount of rows affected by the query.
@@ -44,6 +47,7 @@ class QueryBuilder
     protected $type   = 0;
     protected $orders = array();
     protected $wheres = array();
+    protected $subs = array();
     protected $fields = array();
     protected $skip   = null;
     protected $limit  = null;
@@ -137,6 +141,7 @@ class QueryBuilder
      */
     public function __toString()
     {
+        try {
         switch ($this->type)
         {
             case self::SELECT:
@@ -152,11 +157,14 @@ class QueryBuilder
                 $query .= implode(', ', $fields);
                 unset($fields);
 
+                // Add the subselects
+                $query .= self::generateSubs($this->subs, $this->table);
+
                 // Add the FROM part
                 $query .= ' FROM '. self::tableName($this->table);
 
                 // Add the WHERE part
-                $query .= self::generateWhere($this->wheres);
+                $query .= self::generateWhere($this->wheres, $this->table);
 
                 // Add the ORDER BY part
                 $query .= self::generateOrder($this->orders);
@@ -180,7 +188,7 @@ class QueryBuilder
                 }
 
                 // Add the WHERE part
-                $query .= self::generateWhere($this->wheres);
+                $query .= self::generateWhere($this->wheres, $this->table);
 
                 // Add the ORDER BY part
                 $query .= self::generateOrder($this->orders);
@@ -196,7 +204,7 @@ class QueryBuilder
                 $query = 'DELETE FROM '. self::tableName($this->table) . '';
 
                 // Add WHERE part
-                $query .= self::generateWhere($this->wheres);
+                $query .= self::generateWhere($this->wheres, $this->table);
 
                 // Add the ORDER BY part
                 $query .= self::generateOrder($this->orders);
@@ -213,7 +221,7 @@ class QueryBuilder
                 $query = 'SELECT COUNT(*) FROM '. self::tableName($this->table);
 
                 // Add the WHERE part
-                $query .= self::generateWhere($this->wheres);
+                $query .= self::generateWhere($this->wheres, $this->table);
 
                 // Add the ORDER BY part
                 $query .= self::generateOrder($this->orders);
@@ -225,6 +233,7 @@ class QueryBuilder
                 throw new DomainException('Unknown query type #'. $this->type .'.');
                 break;
         }
+    } catch (Exception $ex) { exit('Err '.$ex->getMessage()); };
         return $query;
     }
 
@@ -249,6 +258,12 @@ class QueryBuilder
     public function limit($amount)
     {
         $this->limit = intval($amount);
+        return $this;
+    }
+
+    public function sub($as, $query, array $with = array())
+    {
+        $this->subs[$as] = new SubSelect($query, $with);
         return $this;
     }
 
@@ -310,6 +325,16 @@ class QueryBuilder
     public function getOrderRules()
     {
         return $this->orders;
+    }
+
+    /**
+     * Gets all the subselects this query has
+     *
+     * @return SubSelect[] The subselects
+     */
+    public function getSubSelects()
+    {
+        return $this->subs;
     }
 
     /**
@@ -399,9 +424,10 @@ class QueryBuilder
     /**
      * Generates a string containg all the where conditions
      * @param WhereCondition[] &$conditions A collection of conditions
+     * @param string $table Context: the table
      * @return string All the where-conditions linked
      */
-    protected static function generateWhere(&$conditions)
+    protected static function generateWhere(&$conditions, $table = null)
     {
         $query = '';
 
@@ -452,6 +478,14 @@ class QueryBuilder
                         $query .= 'IN ('. implode(', ', $quoted) .')';
                         unset($quoted);
                         break;
+                    case self::INSUB:
+                        // Make sure the value is an array
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE IN is not a subselect.');
+
+                        $where->value->setContext($table);
+                        $query .= 'IN ('. (string) $where->value .')';
+                        break;
                     case self::GT:
                         $query .= '> '. self::$pdo->quote($where->value);
                         break;
@@ -466,6 +500,9 @@ class QueryBuilder
                         break;
                     case self::REFS:
                         $query .= ' = '. self::$pdo->quote($where->value->__toString());
+                        break;
+                    case self::NREFS:
+                        $query .= ' != '. self::$pdo->quote($where->value->__toString());
                         break;
                     default:
                         throw new DomainException('The given WHERE type #'. strip_tags($where->type) .' is not implemented (yet).');
@@ -498,6 +535,24 @@ class QueryBuilder
 
         return $query;
     }
+
+    protected static function generateSubs(&$subs, $table)
+    {
+        $subCount = count($subs);
+        if (!$subCount)
+            return '';
+
+        $out = '';
+
+        foreach ($subs as $as => $sub)
+        {
+            $sub->setContext($table);
+            $out .= ', ('.(string) $sub.') AS '. self::fieldName($as);
+            $first = false;
+        }
+
+        return $out;
+    }
 }
 
 /**
@@ -516,7 +571,7 @@ class WhereCondition
 
     public function __construct($or, $field, $type, $value)
     {
-        if (!is_int($type) || $type < 0 || $type > 7)
+        if (!is_int($type) || $type < 0 || $type > 9)
             throw new UnexpectedValueException('The type for this condition is not valid.');
 
         $this->or = $or == true;
@@ -547,4 +602,59 @@ class OrderRule
         $this->field = $field;
         $this->descending = $descending == true;
     }
+}
+
+/**
+ * Internal one-dimensional datastructure representing a subselect
+ */
+class SubSelect
+{
+
+    /**
+     * @var string|null $as The nickname for this field
+     * @var string $query The sub SELECT query
+     * @var string[] $with The names of the fields the ?s must be replaced with
+     * @var string $table Context table
+     * @var boolean $first Context first field
+     */
+    public $query, $with;
+    protected $table;
+
+    public function __construct($query, array $with = array())
+    {
+        $this->query = $query;
+        $this->with = $with;
+    }
+
+    public function setContext($table)
+    {
+        $this->table = $table;
+    }
+
+    public function __toString()
+    {
+        // Work around escaped paremeters
+        $query = str_replace('\\@', '@\\', $this->query);
+
+        // Loop through all the withs and replcae them with the field name
+        foreach($this->with as $key => $with) {
+            // Check whether the key is valid (an integer or a :string without space)
+            if (is_int($key) || (is_string($key) && strlen($key) > 0 && $key[0] == ':' && !preg_match('/\s/', $key))) {
+                // If the field doesnt specify a table already, add it
+                $field = (is_array($with)) ? $with : [$this->table, $with];
+                // Replace the %parameter
+                $query = str_replace('@'. $key, QueryBuilder::fieldName($field), $query);
+            }
+            // Throw an error for invalid keys
+            else
+                throw new Exception('Subselect with-key '. strip_tags($key) . ' is not valid. It must either be an integer or a spaceless string prefixed with a colon (:)');
+        }
+
+        // Add the @table param
+        $query = str_replace('@table', QueryBuilder::tableName($this->table), $query);
+
+        // Put back original @ signs
+        return str_replace('@\\', '@', $query);
+    }
+
 }
