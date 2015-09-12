@@ -94,17 +94,35 @@ trait XS
 
         // If the action is get and the field is readable, pass it onto the getField method
         if ($action == 'get') {
-            if (self::sqlXS()->isReadable($field)) {
-                return $this->getField($field);
+            if (!self::sqlXS()->isReadable($field)) {
+                foreach(array_keys($this->data) as $possibleField)
+                {
+                    if (str_replace('_', '', $field) == $field)
+                        $field = $possibleField;
+                }
+                
+                if (!self::sqlXS()->isReadable($field))
+                    throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
+                else
+                    return $this->getField($field);
             } else {
-                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
+                return $this->getField($field);
             }
         // If the action is set and the field is writable, pass it onto the setField method
         } elseif (isset($arguments[0])) {
-            if (self::sqlXS()->isWritable($field)) {
-                return $this->setField($field, $arguments[0]);
+            if (!self::sqlXS()->isWritable($field)) {
+                foreach(array_keys($this->data) as $possibleField)
+                {
+                    if (str_replace('_', '', $field) == $field)
+                        $field = $possibleField;
+                }
+                
+                if (!self::sqlXS()->isWritable($field))
+                    throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
+                else
+                    return $this->setField($field, $arguments[0]);
             } else {
-                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
+                return $this->setField($field, $arguments[0]);
             }
         } else {
             throw new XsException(__CLASS__ .'::'. $functionName .' needs a $value argument.');
@@ -120,9 +138,17 @@ trait XS
      */
     private function getField($field)
     {
-        if (!array_key_exists($field, $this->data))
-            throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        if (!array_key_exists($field, $this->data)) {
+            foreach(array_keys($this->data) as $possibleField)
+            {
+                if (str_replace('_', '', $field) == $field)
+                    $field = $possibleField;
+            }
 
+            if (!array_key_exists($field, $this->data))
+                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        }
+        
         return $this->data[$field];
     }
 
@@ -136,8 +162,17 @@ trait XS
      */
     private function setField($field, $value)
     {
-        if (!array_key_exists($field, $this->data))
-            throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        if (!array_key_exists($field, $this->data)) {
+            foreach(array_keys($this->data) as $possibleField)
+            {
+                if (str_replace('_', '', $field) == $field)
+                    $field = $possibleField;
+            }
+            
+            if (!array_key_exists($field, $this->data))            
+                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        }
+        
         $type = self::sqlXS()->getType($field);
         if ($type !== null) {
             if (is_scalar($value)) {
@@ -201,6 +236,25 @@ trait XS
     public function id()
     {
         return $this->id;
+    }
+    
+    /**
+     * Returns all the data
+     *
+     * @param int $nest Nest data
+     * @return array The data
+     */
+    public function data($nest = 1)
+    {
+        $xs = $this->sqlXS();
+        
+        $data = $this->data;
+        foreach($data as $key => $value)
+            if (!$xs->isReadable($key))
+                unset($data[$key]);
+            elseif (is_object($value) && in_array(__TRAIT__, class_uses(get_class($value))))
+                $data[$key] = $nest < 1 ? (string) $value : $value->data($nest -1);
+        return $data;
     }
 
     public function __toString()
