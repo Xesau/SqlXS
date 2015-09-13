@@ -26,7 +26,7 @@ trait XS
      * @var array $changes The changes made to the object
      */
     private static $buffer = array();
-    private $id, $data, $changes = array();
+    private $id, $data, $unloaded = array(), $changes = array();
 
     /**
      * Returns SqlXS table configuration, containing the table name, the
@@ -61,7 +61,7 @@ trait XS
             foreach ($this->data as $field => $value) {
                 $type = $xs->getType($field);
                 if ($type !== null) {
-                    $this->data[$field] = $type::byID($value);
+                    $this->unloaded[] = $field;
                 }
             }
         } catch (PDOException $ex) {
@@ -94,33 +94,15 @@ trait XS
 
         // If the action is get and the field is readable, pass it onto the getField method
         if ($action == 'get') {
-            if (!self::sqlXS()->isReadable($field)) {
-                foreach(array_keys($this->data) as $possibleField)
-                {
-                    if (str_replace('_', '', $field) == $field)
-                        $field = $possibleField;
-                }
-                
-                if (!self::sqlXS()->isReadable($field))
+            if (!self::sqlXS()->isReadable($field) && !self::sqlXS()->isReadable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
-                else
-                    return $this->getField($field);
             } else {
                 return $this->getField($field);
             }
         // If the action is set and the field is writable, pass it onto the setField method
         } elseif (isset($arguments[0])) {
-            if (!self::sqlXS()->isWritable($field)) {
-                foreach(array_keys($this->data) as $possibleField)
-                {
-                    if (str_replace('_', '', $field) == $field)
-                        $field = $possibleField;
-                }
-                
-                if (!self::sqlXS()->isWritable($field))
+            if (!self::sqlXS()->isWritable($field) && !self::sqlXS()->isWritable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
-                else
-                    return $this->setField($field, $arguments[0]);
             } else {
                 return $this->setField($field, $arguments[0]);
             }
@@ -138,19 +120,20 @@ trait XS
      */
     private function getField($field)
     {
-        if (!array_key_exists($field, $this->data)) {
-            foreach(array_keys($this->data) as $possibleField)
-            {
-                if (str_replace('_', '', $field) == $field)
-                    $field = $possibleField;
-            }
-
-            if (!array_key_exists($field, $this->data))
-                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        if (!array_key_exists($field, $this->data) && !array_key_exists($field = $this->getPossibleFieldname($field), $this->data)) {
+            throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        }
+        
+        // Eager loading of recerening objects
+        if (in_array($field, $this->unloaded)) {
+            $type = self::sqlXS()->getType($field);
+            $this->data[$field] = $type::byID($this->data[$field]);
+            unset($this->unloaded[array_search($field, $this->unloaded)]);
         }
         
         return $this->data[$field];
     }
+    
 
     /**
      * Sets a field to a new value
@@ -162,14 +145,7 @@ trait XS
      */
     private function setField($field, $value)
     {
-        if (!array_key_exists($field, $this->data)) {
-            foreach(array_keys($this->data) as $possibleField)
-            {
-                if (str_replace('_', '', $field) == $field)
-                    $field = $possibleField;
-            }
-            
-            if (!array_key_exists($field, $this->data))            
+        if (!array_key_exists($field, $this->data) && !array_key_exists($this->getPossibleFieldname($field), $this->data)) {      
                 throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
         }
         
@@ -186,6 +162,19 @@ trait XS
         $this->changes[$field] = ($type == null ? $value : $value->id());
         return $this;
     }
+    
+    /**
+     * Gets a possible field name based on the given $prediction
+     */
+    private function getPossibleFieldname($prediction)
+    {
+        foreach(array_keys($this->data) as $possibleField)
+        {
+            if (str_replace('_', '', $possibleField) == $prediction)
+                return $possibleField;
+        }
+        return null;
+    }
 
     /**
      * Gets an object by it's identifier
@@ -195,13 +184,17 @@ trait XS
      */
     public static function byID($id)
     {
-        if (isset(self::$buffer[$id])) {
+        if (array_key_exists($id, self::$buffer)) {
             return self::$buffer[$id];
         } else {
+//            if (!in_array(__CLASS__,['XBB\\Model\\Session','XBB\\Model\\User']))
+  //              exit('cndn '.__CLASS__.':'.$id);
+    //        self::$buffer[$id] = null;
             try {
-                return self::$buffer[$id] = new static($id);
+                self::$buffer[$id] = new static($id);
+                return self::$buffer[$id];
             } catch (XsException $ex) {
-                return null;
+                return self::$buffer[$id] = null;
             }
         }
     }
@@ -299,11 +292,11 @@ trait XS
     /**
      * Creates a new Count Query Builder for this table
      *
-     * @return QueryBuilder The Query Builder
+     * @return XsQueryBuilder The Query Builder
      */
     public static function count()
     {
-        return new QueryBuilder(QueryBuilder::COUNT, self::sqlXS()->getTable());
+        return new XsQueryBuilder(QueryBuilder::COUNT, __CLASS__);
     }
     
     /**
