@@ -500,10 +500,10 @@ class QueryBuilder
                         $query .= '<= '. self::$pdo->quote($where->value);
                         break;
                     case self::REFS:
-                        $query .= ' = '. self::$pdo->quote($where->value->__toString());
+                        $query .= ' = '. self::$pdo->quote((string) $where->value);
                         break;
                     case self::NREFS:
-                        $query .= ' != '. self::$pdo->quote($where->value->__toString());
+                        $query .= ' != '. self::$pdo->quote((string) $where->value);
                         break;
                     default:
                         throw new DomainException('The given WHERE type #'. strip_tags($where->type) .' is not implemented (yet).');
