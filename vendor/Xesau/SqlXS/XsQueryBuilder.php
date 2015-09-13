@@ -37,7 +37,7 @@ class XsQueryBuilder extends QueryBuilder
     }
 
     /**
-     * Fetch the first n objects, and moves the skip pointer ahead
+     * Fetches the first n objects, and moves the skip pointer ahead
      *
      * @param int $amount The amount of objects
      * @throws XsException When the query type is not SELECT
@@ -82,7 +82,7 @@ class XsQueryBuilder extends QueryBuilder
     }
 
     /**
-     * Select all results from the query
+     * Selects all results from the query
      *
      * @throws XsException When the query type is not SELECT
      * @return XS[] The objects
@@ -102,6 +102,26 @@ class XsQueryBuilder extends QueryBuilder
             $output[] = $xs::byID($entry[0]);
 
         return $output;
+    }
+    
+    /**
+     * Counts the results
+     *
+     * @return int The count
+     */
+    public function count()
+    {
+        if ($this->type != QueryBuilder::COUNT)
+            throw new XsException('Only COUNT queries can use count().');
+        
+        // Perform the count
+        $stmt = $this->perform();
+        
+        // Fetch the result
+        $result = $stmt->fetch(PDO::FETCH_NUM);
+        
+        // Return the count
+        return $result[0];
     }
 
 }
