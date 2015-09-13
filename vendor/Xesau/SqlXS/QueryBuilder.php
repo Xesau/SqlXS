@@ -22,6 +22,7 @@ class QueryBuilder
     const SELECT = 0;
     const UPDATE = 1;
     const DELETE = 2;
+    const COUNT = 3;
 
     // Where types
     const EQ   = 0;
@@ -76,7 +77,7 @@ class QueryBuilder
      */
     public function __construct($type, $table, array $fields = array())
     {
-        if ($type < 0 && $type > 2)
+        if ($type < 0 && $type > 3)
             throw new DomainException('Type #'. striptags($type) . ' is no valid Query type.');
 
         $this->type = $type;
