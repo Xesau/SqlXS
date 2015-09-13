@@ -265,7 +265,7 @@ trait XS
     /**
      * Creates a new Select Query Builder for this table
      *
-     * @return QueryBuilder The query builder
+     * @return XsQueryBuilder The query builder
      */
     public static function select()
     {
@@ -295,7 +295,17 @@ trait XS
     {
         return new QueryBuilder(QueryBuilder::DELETE, self::sqlXS()->getTable());
     }
-
+    
+    /**
+     * Creates a new Count Query Builder for this table
+     *
+     * @return QueryBuilder The Query Builder
+     */
+    public static function count()
+    {
+        return new QueryBuilder(QueryBuilder::COUNT, self::sqlXS()->getTable());
+    }
+    
     /**
      * Inserts a new row in the table
      *
