@@ -187,9 +187,6 @@ trait XS
         if (array_key_exists($id, self::$buffer)) {
             return self::$buffer[$id];
         } else {
-//            if (!in_array(__CLASS__,['XBB\\Model\\Session','XBB\\Model\\User']))
-  //              exit('cndn '.__CLASS__.':'.$id);
-    //        self::$buffer[$id] = null;
             try {
                 self::$buffer[$id] = new static($id);
                 return self::$buffer[$id];
@@ -241,13 +238,25 @@ trait XS
     {
         $xs = $this->sqlXS();
         
-        $data = $this->data;
-        foreach($data as $key => $value)
+        $result = $this->data;
+        
+        // Loop over each field
+        foreach($result as $key => $value) {
+            
+            // if it's not readable, remove it from the result
             if (!$xs->isReadable($key))
-                unset($data[$key]);
-            elseif (is_object($value) && in_array(__TRAIT__, class_uses(get_class($value))))
-                $data[$key] = $nest < 1 ? (string) $value : $value->data($nest -1);
-        return $data;
+                unset($result[$key]);
+            elseif($nest > 0) {
+                if (in_array($key, $this->unloaded)) {
+                    $nxs = $xs->getType($key);
+                    $this->data[$key] = $nxs::byID($value);
+                }
+
+                if(is_object($this->data[$key]))
+                    $result[$key] = $this->data[$key]->data($nest - 1);
+            }
+        }
+        return $result;
     }
 
     public function __toString()
