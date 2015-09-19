@@ -332,7 +332,6 @@ trait XS
         }
 
         try {
-        echo 'i';
             XsConfiguration::getPDO()->query('INSERT INTO '. QueryBuilder::tableName(self::sqlXS()->getTable()) .' ('. implode(', ', $fields) .') VALUES ('. implode(', ', $values) .')');
             return self::byID(XsConfiguration::getPDO()->lastInsertId());
         } catch (PDOException $ex) {
