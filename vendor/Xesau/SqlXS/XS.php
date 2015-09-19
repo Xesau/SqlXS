@@ -321,8 +321,8 @@ trait XS
 
             // Make sure type is correct
             $type = self::sqlXS()->getType($f);
-            if ($type !== null && !is_scalar($v))
-                $v = $v->id();
+            if ($v !== null !is_scalar($v))
+                $v = (string) $v;
 
             $values[] = XsConfiguration::getPDO()->quote($v);
         }
