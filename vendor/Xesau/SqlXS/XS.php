@@ -321,13 +321,18 @@ trait XS
 
             // Make sure type is correct
             $type = self::sqlXS()->getType($f);
-            if ($v !== null !is_scalar($v))
-                $v = (string) $v;
+            if ($v !== null) {
+                if ($type !== null)
+                    $v = $v->id();
 
-            $values[] = XsConfiguration::getPDO()->quote($v);
+                $v = XsConfiguration::getPDO()->quote($v);
+            } else
+                $v = 'NULL';
+            $values [] = $v;
         }
 
         try {
+        echo 'i';
             XsConfiguration::getPDO()->query('INSERT INTO '. QueryBuilder::tableName(self::sqlXS()->getTable()) .' ('. implode(', ', $fields) .') VALUES ('. implode(', ', $values) .')');
             return self::byID(XsConfiguration::getPDO()->lastInsertId());
         } catch (PDOException $ex) {
