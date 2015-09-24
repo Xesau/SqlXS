@@ -83,25 +83,38 @@ trait XS
     public function __call($functionName, $arguments)
     {
         // Make sure the function name contains get* or set* at least
-        if (strlen ($functionName) < 4) return;
+        if (strlen($functionName) < 4)
+            trigger_error('Call to undefined method '.__CLASS__.'::'.$functionName.'()', E_USER_ERROR);;
+        
         $functionName = strtolower($functionName);
-        $action = substr ($functionName, 0, 3);
+        $action = substr($functionName, 0, 3);
         if ($action != 'get' && $action != 'set')
             trigger_error('Call to undefined method '.__CLASS__.'::'.$functionName.'()', E_USER_ERROR);
 
         // Get the field
         $field = substr ($functionName, 3);
-
+        
+        // Check the field name
+        if (!array_key_exists($field, $this->data)) {
+            $field2 = $this->getPossibleFieldname($field);
+        
+            if (!array_key_exists($field2, $this->data)) {
+                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' does not exist');
+            } else
+                $field = $field2;
+        }
+        
         // If the action is get and the field is readable, pass it onto the getField method
         if ($action == 'get') {
-            if (!self::sqlXS()->isReadable($field) && !self::sqlXS()->isReadable($this->getPossibleFieldname($field))) {
+            if (!self::sqlXS()->isReadable($field)) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
             } else {
                 return $this->getField($field);
             }
         // If the action is set and the field is writable, pass it onto the setField method
         } elseif (isset($arguments[0])) {
-            if (!self::sqlXS()->isWritable($field) && !self::sqlXS()->isWritable($this->getPossibleFieldname($field))) {
+            
+            if (!self::sqlXS()->isWritable($field)) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
             } else {
                 return $this->setField($field, $arguments[0]);
@@ -261,7 +274,7 @@ trait XS
 
     public function __toString()
     {
-        return $this->id();
+        return (string) $this->id();
     }
 
     /**
@@ -322,9 +335,9 @@ trait XS
             // Make sure type is correct
             $type = self::sqlXS()->getType($f);
             if ($v !== null) {
-                if ($type !== null)
+                if ($type !== null && is_object($v))
                     $v = $v->id();
-
+                
                 $v = XsConfiguration::getPDO()->quote($v);
             } else
                 $v = 'NULL';
