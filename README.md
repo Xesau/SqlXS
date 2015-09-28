@@ -19,7 +19,7 @@ much understanding of MySQL. That's why it's called a generator.
         use SqlXS\XS;
         public static function sqlXS()
         {
-            return new SqlXS\\XsInfo('table name', 'unique field', ['readable', 'fields'], ['writable', 'fields'], ['field' => '\\Type']);
+            return new SqlXS\XsInfo('table name', 'unique field', ['readable', 'fields'], ['writable', 'fields'], ['field' => '\\Type']);
         }
      }
 
