@@ -26,6 +26,7 @@ trait XS
      * @var array $changes The changes made to the object
      */
     private static $buffer = array();
+    private static $fieldTable = false;
     private $id, $data, $unloaded = array(), $changes = array();
 
     /**
@@ -83,38 +84,25 @@ trait XS
     public function __call($functionName, $arguments)
     {
         // Make sure the function name contains get* or set* at least
-        if (strlen($functionName) < 4)
-            trigger_error('Call to undefined method '.__CLASS__.'::'.$functionName.'()', E_USER_ERROR);;
-        
+        if (strlen ($functionName) < 4) return;
         $functionName = strtolower($functionName);
-        $action = substr($functionName, 0, 3);
+        $action = substr ($functionName, 0, 3);
         if ($action != 'get' && $action != 'set')
             trigger_error('Call to undefined method '.__CLASS__.'::'.$functionName.'()', E_USER_ERROR);
 
         // Get the field
         $field = substr ($functionName, 3);
-        
-        // Check the field name
-        if (!array_key_exists($field, $this->data)) {
-            $field2 = $this->getPossibleFieldname($field);
-        
-            if (!array_key_exists($field2, $this->data)) {
-                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' does not exist');
-            } else
-                $field = $field2;
-        }
-        
+
         // If the action is get and the field is readable, pass it onto the getField method
         if ($action == 'get') {
-            if (!self::sqlXS()->isReadable($field)) {
+            if (!self::sqlXS()->isReadable($field) && !self::sqlXS()->isReadable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
             } else {
                 return $this->getField($field);
             }
         // If the action is set and the field is writable, pass it onto the setField method
         } elseif (isset($arguments[0])) {
-            
-            if (!self::sqlXS()->isWritable($field)) {
+            if (!self::sqlXS()->isWritable($field) && !self::sqlXS()->isWritable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
             } else {
                 return $this->setField($field, $arguments[0]);
@@ -136,17 +124,17 @@ trait XS
         if (!array_key_exists($field, $this->data) && !array_key_exists($field = $this->getPossibleFieldname($field), $this->data)) {
             throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
         }
-        
+
         // Eager loading of recerening objects
         if (in_array($field, $this->unloaded)) {
             $type = self::sqlXS()->getType($field);
             $this->data[$field] = $type::byID($this->data[$field]);
             unset($this->unloaded[array_search($field, $this->unloaded)]);
         }
-        
+
         return $this->data[$field];
     }
-    
+
 
     /**
      * Sets a field to a new value
@@ -158,10 +146,10 @@ trait XS
      */
     private function setField($field, $value)
     {
-        if (!array_key_exists($field, $this->data) && !array_key_exists($this->getPossibleFieldname($field), $this->data)) {      
+        if (!array_key_exists($field, $this->data) && !array_key_exists($this->getPossibleFieldname($field), $this->data)) {
                 throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
         }
-        
+
         $type = self::sqlXS()->getType($field);
         if ($type !== null) {
             if (is_scalar($value)) {
@@ -175,18 +163,27 @@ trait XS
         $this->changes[$field] = ($type == null ? $value : $value->id());
         return $this;
     }
-    
+
     /**
      * Gets a possible field name based on the given $prediction
      */
     private function getPossibleFieldname($prediction)
     {
+        if (self::$fieldTable !== false)
+            if (isset(self::$fieldTable[$prediction]))
+                return self::$fieldTable[$prediction];
+
         foreach(array_keys($this->data) as $possibleField)
         {
             if (str_replace('_', '', $possibleField) == $prediction)
                 return $possibleField;
         }
         return null;
+    }
+
+    public static function registerFieldTable(array $table)
+    {
+        self::$fieldTable = $table;
     }
 
     /**
@@ -240,7 +237,7 @@ trait XS
     {
         return $this->id;
     }
-    
+
     /**
      * Returns all the data
      *
@@ -250,12 +247,12 @@ trait XS
     public function data($nest = 1)
     {
         $xs = $this->sqlXS();
-        
+
         $result = $this->data;
-        
+
         // Loop over each field
         foreach($result as $key => $value) {
-            
+
             // if it's not readable, remove it from the result
             if (!$xs->isReadable($key))
                 unset($result[$key]);
@@ -274,7 +271,7 @@ trait XS
 
     public function __toString()
     {
-        return (string) $this->id();
+        return $this->id();
     }
 
     /**
@@ -310,7 +307,7 @@ trait XS
     {
         return new QueryBuilder(QueryBuilder::DELETE, self::sqlXS()->getTable());
     }
-    
+
     /**
      * Creates a new Count Query Builder for this table
      *
@@ -320,7 +317,7 @@ trait XS
     {
         return new XsQueryBuilder(QueryBuilder::COUNT, __CLASS__);
     }
-    
+
     /**
      * Inserts a new row in the table
      *
@@ -334,14 +331,10 @@ trait XS
 
             // Make sure type is correct
             $type = self::sqlXS()->getType($f);
-            if ($v !== null) {
-                if ($type !== null && is_object($v))
-                    $v = $v->id();
-                
-                $v = XsConfiguration::getPDO()->quote($v);
-            } else
-                $v = 'NULL';
-            $values [] = $v;
+            if ($type !== null && !is_scalar($v))
+                $v = $v->id();
+
+            $values[] = XsConfiguration::getPDO()->quote($v);
         }
 
         try {
