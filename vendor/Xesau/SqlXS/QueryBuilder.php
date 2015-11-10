@@ -35,6 +35,7 @@ class QueryBuilder
     const REFS = 7;
     const NREFS = 8;
     const INSUB = 9;
+    const LIKE = 10
 
     /**
      * @var int $type The query type
@@ -462,6 +463,10 @@ class QueryBuilder
                         else
                             $query .= '!= '. self::$pdo->quote($where->value);
                             break;
+                            
+                    case self::LIKE:
+                        $query .= 'LIKE '. self::$pdo->quote($where->value);;
+                        break;
                     case self::IN:
                         // Make sure the value is an array
                         if (!is_array($where->value))
@@ -572,7 +577,7 @@ class WhereCondition
 
     public function __construct($or, $field, $type, $value)
     {
-        if (!is_int($type) || $type < 0 || $type > 9)
+        if (!is_int($type) || $type < 0 || $type > 10)
             throw new UnexpectedValueException('The type for this condition is not valid.');
 
         $this->or = $or == true;
