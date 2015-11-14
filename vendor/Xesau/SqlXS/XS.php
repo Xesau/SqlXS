@@ -121,8 +121,12 @@ trait XS
      */
     private function getField($field)
     {
-        if (!array_key_exists($field, $this->data) && !array_key_exists($field = $this->getPossibleFieldname($field), $this->data)) {
-            throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+        if (!array_key_exists($field, $this->data)) {
+            if(!array_key_exists($tmp = $this->getPossibleFieldname($field), $this->data)) {
+                throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+            } else {
+                $field = $tmp;
+            }
         }
 
         // Eager loading of recerening objects
@@ -146,8 +150,12 @@ trait XS
      */
     private function setField($field, $value)
     {
-        if (!array_key_exists($field, $this->data) && !array_key_exists($this->getPossibleFieldname($field), $this->data)) {
+        if (!array_key_exists($field, $this->data)) {
+            if(!array_key_exists($tmp = $this->getPossibleFieldname($field), $this->data)) {
                 throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) . ' is not defined.');
+            } else {
+                $field = $tmp;
+            }
         }
 
         $type = self::sqlXS()->getType($field);
@@ -170,8 +178,11 @@ trait XS
     private function getPossibleFieldname($prediction)
     {
         if (self::$fieldTable !== false)
-            if (isset(self::$fieldTable[$prediction]))
-                return self::$fieldTable[$prediction];
+            if (isset(self::$fieldTable[$prediction])) {
+                if (isset($this->data[self::$fieldTable[$prediction]]))
+                    return self::$fieldTable[$prediction];
+            } elseif (($alias = self::getPossibleFieldAlias($prediction)) != null)
+                return self::$fieldTable[$alias];
 
         foreach(array_keys($this->data) as $possibleField)
         {
@@ -179,6 +190,18 @@ trait XS
                 return $possibleField;
         }
         return null;
+    }
+
+    private static function getPossibleFieldAlias($prediction)
+    {
+        if (self::$fieldTable === false)
+            return null;
+
+        foreach(self::$fieldTable as $alias => $field) {
+            if (($i = str_replace('_', '', $alias)) == $prediction)
+                return $alias;
+        }
+        return $null;
     }
 
     public static function registerFieldTable(array $table)
