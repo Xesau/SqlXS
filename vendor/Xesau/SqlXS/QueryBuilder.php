@@ -166,14 +166,19 @@ class QueryBuilder
                     throw new UnexpectedValueException('There are no fields provided to select.');
                 $query = 'SELECT ';
 
-                // Add the fields that must be selected
-                $fields = array();
-                foreach ($this->fields as $field)
-                    $fields[] = self::fieldName($field);
-
-                $query .= implode(', ', $fields);
-                unset($fields);
-
+                if ($this->fields == array())
+                {
+                    // Add the fields that must be selected
+                    $fields = array();
+                    foreach ($this->fields as $field)
+                        $fields[] = self::fieldName($field);
+    
+                    $query .= implode(', ', $fields);
+                    unset($fields);
+                }
+                else
+                    $query .= '*';
+                
                 // Add the subselects
                 $query .= self::generateSubs($this->subs, $this->table);
 
