@@ -26,16 +26,31 @@ class QueryBuilder
 
     // Where types
     const EQ   = 0;
+    const NE   = 1;
     const NEQ  = 1;
+    
     const LT   = 2;
     const GT   = 3;
-    const IN   = 4;
+    
+    const LTSUB = 14;
+    const GTSUB = 15;
+    
     const LTEQ = 5;
     const GTEQ = 6;
+    
+    const LTEQSUB = 12;
+    const GTEQSUB = 13;
+    
+    const IN   = 4;
+    const NIN  = 10;
+    
+    const INSUB = 9;
+    const NINSUB = 11;
+    
     const REFS = 7;
     const NREFS = 8;
-    const INSUB = 9;
-    const LIKE = 10;
+    
+    const LIKE = 16;
 
     /**
      * @var int $type The query type
@@ -463,10 +478,9 @@ class QueryBuilder
                         else
                             $query .= '!= '. self::$pdo->quote($where->value);
                             break;
-                            
                     case self::LIKE:
-                        $query .= 'LIKE '. self::$pdo->quote($where->value);;
-                        break;
+                            $query .= 'LIKE '. self::$pdo->quote($where->value);
+                            break;
                     case self::IN:
                         // Make sure the value is an array
                         if (!is_array($where->value))
@@ -484,13 +498,38 @@ class QueryBuilder
                         $query .= 'IN ('. implode(', ', $quoted) .')';
                         unset($quoted);
                         break;
+                    case self::NIN:
+                        // Make sure the value is an array
+                        if (!is_array($where->value))
+                            throw new UnexpectedValueException('The given value for the WHERE NOT IN is not an array.');
+
+                        // Make sure it's not empty
+                        if (!count($where->value))
+                            throw new UnexpectedValueException('The given array for the WHERE NOT IN is empty.');
+
+                        // Quote all the values
+                        $quoted = array();
+                        foreach ($where->value as $value)
+                            $quoted[] = self::$pdo->quote($value);
+
+                        $query .= 'NOT IN ('. implode(', ', $quoted) .')';
+                        unset($quoted);
+                        break;
                     case self::INSUB:
                         // Make sure the value is an array
                         if (!$where->value instanceof SubSelect)
-                            throw new UnexpectedValueException('The given value for the WHERE IN is not a subselect.');
+                            throw new UnexpectedValueException('The given value for the WHERE IN(SUB) is not a subselect.');
 
                         $where->value->setContext($table);
                         $query .= 'IN ('. (string) $where->value .')';
+                        break;
+                    case self::NINSUB:
+                        // Make sure the value is an array
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE NOT IN(SUB) is not a subselect.');
+
+                        $where->value->setContext($table);
+                        $query .= 'NOT IN ('. (string) $where->value .')';
                         break;
                     case self::GT:
                         $query .= '> '. self::$pdo->quote($where->value);
@@ -498,11 +537,35 @@ class QueryBuilder
                     case self::LT:
                         $query .= '< '. self::$pdo->quote($where->value);
                         break;
+                    case self::GTSUB:
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE GT(SUB) is not a subselect.');
+                        $where->value->setContext($table);
+                        $query .= '> ('. (string) $where->value .')';
+                        break;
+                    case self::LTSUB:
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE LT(SUB) is not a subselect.');
+                        $where->value->setContext($table);
+                        $query .= '< ('. (string) $where->value .')';
+                        break;
                     case self::GTEQ:
                         $query .= '>= '. self::$pdo->quote($where->value);
                         break;
                     case self::LTEQ:
                         $query .= '<= '. self::$pdo->quote($where->value);
+                        break;
+                    case self::GTEQSUB:
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE GTEQ(SUB) is not a subselect.');
+                        $where->value->setContext($table);
+                        $query .= '>= ('. (string) $where->value .')';
+                        break;
+                    case self::LTEQSUB:
+                        if (!$where->value instanceof SubSelect)
+                            throw new UnexpectedValueException('The given value for the WHERE LTEQ(SUB) is not a subselect.');
+                        $where->value->setContext($table);
+                        $query .= '<= ('. (string) $where->value .')';
                         break;
                     case self::REFS:
                         $query .= ' = '. self::$pdo->quote((string) $where->value);
@@ -577,7 +640,7 @@ class WhereCondition
 
     public function __construct($or, $field, $type, $value)
     {
-        if (!is_int($type) || $type < 0 || $type > 10)
+        if (!is_int($type) || $type < 0 || $type > 16)
             throw new UnexpectedValueException('The type for this condition is not valid.');
 
         $this->or = $or == true;
