@@ -35,7 +35,7 @@ class QueryBuilder
     const REFS = 7;
     const NREFS = 8;
     const INSUB = 9;
-    const LIKE = 10
+    const LIKE = 10;
 
     /**
      * @var int $type The query type
