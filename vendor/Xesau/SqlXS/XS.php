@@ -101,7 +101,7 @@ trait XS
                 return $this->getField($field);
             }
         // If the action is set and the field is writable, pass it onto the setField method
-        } elseif (isset($arguments[0])) {
+    } elseif (array_key_exists(0, $arguments)) {
             if (!self::sqlXS()->isWritable($field) && !self::sqlXS()->isWritable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
             } else {
@@ -179,7 +179,7 @@ trait XS
     {
         if (self::$fieldTable !== false)
             if (isset(self::$fieldTable[$prediction])) {
-                if (isset($this->data[self::$fieldTable[$prediction]]))
+                if (array_key_exists(self::$fieldTable[$prediction], $this->data))
                     return self::$fieldTable[$prediction];
             } elseif (($alias = self::getPossibleFieldAlias($prediction)) != null)
                 return self::$fieldTable[$alias];
@@ -201,7 +201,7 @@ trait XS
             if (($i = str_replace('_', '', $alias)) == $prediction)
                 return $alias;
         }
-        return $null;
+        return null;
     }
 
     public static function registerFieldTable(array $table)
