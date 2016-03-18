@@ -119,7 +119,7 @@ trait XS
      * @throws DomainException When the field doesnt exist
      * @return mixed The value of the field
      */
-    private function getField($field)
+    protected function getField($field)
     {
         if (!array_key_exists($field, $this->data)) {
             if(!array_key_exists($tmp = $this->getPossibleFieldname($field), $this->data)) {
@@ -148,7 +148,7 @@ trait XS
      *                      field value is set to the identifier of the object
      * @return $this Builder-style object
      */
-    private function setField($field, $value)
+    protected function setField($field, $value)
     {
         if (!array_key_exists($field, $this->data)) {
             if(!array_key_exists($tmp = $this->getPossibleFieldname($field), $this->data)) {
