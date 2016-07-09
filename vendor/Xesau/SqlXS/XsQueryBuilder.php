@@ -103,7 +103,7 @@ class XsQueryBuilder extends QueryBuilder
 
         return $output;
     }
-    
+
     /**
      * Counts the results
      *
@@ -113,15 +113,15 @@ class XsQueryBuilder extends QueryBuilder
     {
         if ($this->type != QueryBuilder::COUNT)
             throw new XsException('Only COUNT queries can use count().');
-        
+
         // Perform the count
         $stmt = $this->perform();
-        
+
         // Fetch the result
         $result = $stmt->fetch(PDO::FETCH_NUM);
-        
+
         // Return the count
-        return $result[0];
+        return (int)$result[0];
     }
 
 }
