@@ -357,7 +357,7 @@ trait XS
             if ($type !== null && $v !== null && !is_scalar($v))
                 $v = $v->id();
 
-            $values[] = XsConfiguration::getPDO()->quote($v);
+            $values[] = $v == null ? 'NULL' : XsConfiguration::getPDO()->quote($v);
         }
 
         try {
