@@ -237,8 +237,8 @@ trait XS
      */
     public static function release($id)
     {
-        if (isset($this->buffer[$id])) {
-            unset($this->buffer[$id]);
+        if (isset(self::$buffer[$id])) {
+            unset(self::$buffer[$id]);
             return true;
         } else return false;
     }
