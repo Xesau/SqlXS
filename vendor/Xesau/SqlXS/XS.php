@@ -98,10 +98,10 @@ trait XS
             if (!self::sqlXS()->isReadable($field) && !self::sqlXS()->isReadable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not readable.');
             } else {
-                return $this->getField($field);
+                return $this->getField($field, (isset($arguments[1]) ? $arguments[1] : true));
             }
         // If the action is set and the field is writable, pass it onto the setField method
-    } elseif (array_key_exists(0, $arguments)) {
+        } elseif (array_key_exists(0, $arguments)) {
             if (!self::sqlXS()->isWritable($field) && !self::sqlXS()->isWritable($this->getPossibleFieldname($field))) {
                     throw new DomainException('The given field '. strip_tags(self::sqlXS()->getTable()) .'.'. strip_tags($field) .' is not writable.');
             } else {
@@ -119,7 +119,7 @@ trait XS
      * @throws DomainException When the field doesnt exist
      * @return mixed The value of the field
      */
-    protected function getField($field)
+    protected function getField($field, $processed = true)
     {
         if (!array_key_exists($field, $this->data)) {
             if(!array_key_exists($tmp = $this->getPossibleFieldname($field), $this->data)) {
@@ -130,13 +130,19 @@ trait XS
         }
 
         // Eager loading of recerening objects
-        if (in_array($field, $this->unloaded)) {
-            $type = self::sqlXS()->getType($field);
-            $this->data[$field] = $type::byID($this->data[$field]);
-            unset($this->unloaded[array_search($field, $this->unloaded)]);
+        if ($processed === true)
+        {
+            if (in_array($field, $this->unloaded)) {
+                $type = self::sqlXS()->getType($field);
+                $this->data[$field] = $type::byID($this->data[$field]);
+                unset($this->unloaded[array_search($field, $this->unloaded)]);
+            }
         }
-
-        return $this->data[$field];
+        
+        if ($processed === true || !is_object($rt = $this->data[$field]))
+            return $this->data[$field];
+        
+        return $rt->id();
     }
 
 
@@ -217,6 +223,7 @@ trait XS
      */
     public static function byID($id)
     {
+        $id = (string)$id;
         if (array_key_exists($id, self::$buffer)) {
             return self::$buffer[$id];
         } else {
@@ -357,7 +364,7 @@ trait XS
             if ($type !== null && $v !== null && !is_scalar($v))
                 $v = $v->id();
 
-            $values[] = $v == null ? 'NULL' : XsConfiguration::getPDO()->quote($v);
+            $values[] = $v === null ? 'NULL' : XsConfiguration::getPDO()->quote($v);
         }
 
         try {
