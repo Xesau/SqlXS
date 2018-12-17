@@ -108,7 +108,7 @@ class QueryBuilder
      * @return $this The query object
      */
     public function asc($field) {
-        $this->orders [] = new OrderRule($field, false);
+        $this->orders [] = new OrderRule($field, false, false);
         return $this;
     }
 
@@ -119,7 +119,18 @@ class QueryBuilder
      * @return $this The query object
      */
     public function desc($field) {
-        $this->orders [] = new OrderRule($field, true);
+        $this->orders [] = new OrderRule($field, true, false);
+        return $this;
+    }
+
+    /**
+     * Adds a field to the order list, with sorting method RANDOM
+     *
+     * @param string $field The name of the field to sort with
+     * @return $this The query object
+     */
+    public function rand($field = '') {
+        $this->orders [] = new OrderRule($field, false, true);
         return $this;
     }
 
@@ -604,7 +615,15 @@ class QueryBuilder
                 $query .= ', ';
 
             $rule = $orders[$i];
-            $query .= ' '. self::fieldName($rule->field) .($rule->descending ? ' DESC' : ' ASC');
+            if ($rule->random) {
+                if (!empty($rule->field)) {
+                    $query .= ' RAND(' . self::fieldName($rule->field) . ')';
+                } else {
+                    $query .= ' RAND()';
+                }
+            } else {
+                $query .= ' '. self::fieldName($rule->field) .($rule->descending ? ' DESC' : ' ASC');
+            }
         }
 
         return $query;
@@ -664,7 +683,7 @@ class OrderRule
      * @var string|array $field The name of the field the rule applies to
      * @var boolean $descending Whether to order descending
      */
-    public $field, $descending;
+    public $field, $descending, $random;
 
     /**
      * Initiates a new Order rule
@@ -672,9 +691,10 @@ class OrderRule
      * @param string|array $field The field name
      * @param boolean $descending Whether to order descending
      */
-    public function __construct ($field, $descending = false) {
+    public function __construct ($field, $descending = false, $random) {
         $this->field = $field;
         $this->descending = $descending == true;
+        $this->random = $random == true;
     }
 }
 
