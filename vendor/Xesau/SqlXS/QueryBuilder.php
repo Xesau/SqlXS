@@ -691,7 +691,7 @@ class OrderRule
      * @param string|array $field The field name
      * @param boolean $descending Whether to order descending
      */
-    public function __construct ($field, $descending = false, $random) {
+    public function __construct ($field, $descending = false, $random = false) {
         $this->field = $field;
         $this->descending = $descending == true;
         $this->random = $random == true;
